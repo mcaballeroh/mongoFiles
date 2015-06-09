@@ -1,0 +1,502 @@
+MONGO DB
+
+instalar MONGO con sig sig
+
+agregar el directorio de instalación al path
+
+crear la carpeta /data/db para uso de mongo
+
+
+_______________________
+
+tarea1
+
+Importar los datos de descarga
+
+situarse en el directorio padre de la carpeta dumy y ejecutar el comando
+
+
+>mongorestore dump
+
+una vez cargados los datos, podemos verificarlos cambiandonos a la base de datos m101 con:
+
+>use m101
+
+nos muestra switched to m101
+
+despues hacemos un find sobre la coleccion hw1 con
+
+>db.hw1.find()
+
+la tarea nos pide ejecutar el comando 
+
+>db.hw1.findOne()
+
+____________________________
+
+Introducción a find
+
+La instrucción find recibe como argumentos onjetos json para restingir la cantidad de resultados
+
+findOne() es para hacer busquedas de solo un resultado.
+
+La siguiente sentencia encontrará todos los documentos que contengan en user el valor Peter
+db.nombreColeccion.find({user : "Peter"});
+
+cuando se devuelven los resultados se incluye el id de mongo "_id", para especificar si queremos omitir esa o cualquier otra
+propiedad, usamos otro objeto como argumento del find() indicando con true o false si queremos que venga o no en los resultados
+
+db.nombreColeccion.find({user : "Peter"} , {_id: false, email : true});
+
+
+Uso de $gt y $lt
+
+cuando usamos operadores de comparación se debe de mandar un objeto json con las restricciones correspondientes a la propiedad deseada como 
+parametro del find
+
+db.scores.find({score:{$gt : 95}})
+
+para añadir mas restricciones:
+
+db.scores.find({score:{$gt : 95, $lte : 99}, type: "essay"})
+
+$gte y $lte sirven para hacer los intervalos cerrados o inclusivos, quiere decir menor o igual o mayor o igual
+
+
+
+Operadores de comparacion con Strings
+
+En este caso, se comprara por el valor unicode del caracter, b > a, bob > b por ejemplo. Es case sensitive
+
+db.people.find({name : {$lt : "D"}})
+
+ 
+Debido a que mongodb es schemaless, pueden guardarse documentos en la misma coleccion con valores de diferentes tipos en la misma propiedad
+
+p. ej.
+
+{name: "Juan", age: 23}
+{name: 43}
+
+para realizar busquedas sobre este tipo de colecciones, podemos ayudarnos de $exists y $type
+
+para encontrar los documentos donde la propiedad age existe se utilizaría:
+
+db.people.find({ age: {$exists : true}})
+
+Puede utilizarse true o false si queremos el caso ontrario, en cualquier caso, true o false se puede sustituir por 1 o 0
+
+si queremos encontrar los documentos en los que alguna propiedad es de un tipo especifico, podemos usar:
+
+db.people.find({ name: {$type : 2}})
+
+2 es equivalente a String, el valor de $type debe de ser numerico, y concuerda con los tipos de datos definidos por la especificacion de Bson,
+para mas informacion sobre los valores utilizables : http://bsonspec.org/spec.html 
+
+tambien se pueden suar expresiones regulares
+
+db.people.find({ name: {$regex : "a"}})
+
+encontrará todos los documentos que tengan una "a" en su propiedad name
+
+db.people.find({ name: {$regex : "e$"}})
+
+encontrará todos los documentos que tengan una "e" al final 
+
+db.people.find({ name: {$regex : "^J"}})
+
+
+Uso de $or y $and
+
+los operadores reciben un arreglo de docmentos json para representar los operadores logicos
+
+db.people.find( { $or : [ {name: {$regex : "a"}}, { age: {$exists : true}} ]} )
+
+encontrará los documentos que tienen una  a en el propiedad name o donde la propiedad age exista
+
+
+and, es para interseccion
+
+db.people.find( { $and : [ {name: {$gt : "C"}}, { age: {$regex : "a"}} ]} )
+
+db.people.find({name: {$gt : "C", $regex: "a" } } )
+
+
+busquedas dentro de arrays
+
+para hacer una busqueda de una propiedad que está contenida dentro de un arreglo que a su vez está dentro de un documento, el operador find,
+trabajara de forma "polimorfica", buscará tanto propiedades "normales" como propiedades dentro de arreglos.
+
+{name: "Juan", age: 23, favorites : ["pretzel", "beer"]}
+{name: "Isaac", age: 29, favorites : ["pretzel", "gum"]}
+
+se piede buscar los registros con pretzel con
+
+db.people.find({favorites : "pretzel"})
+
+solo se busca dentro de elementos de primer nivel, si los valores están anidados profundamente, no se encontraran
+
+
+$in y $all
+
+$all, se utiliza para encontrar los documentos que tienen todos los valores incluidos en el arreglo que se pasa como parametro
+
+db.people.find({favorites : { $all : ["pretzel","beer"]}})
+
+en este caso los documentos encontrados tendran beer y pretzel como parte de sus favoritos, ademas podrían contener otras cosas
+
+$in, en este caso, encontrará los docuementos que tengan alguno de los valores indicados en el arreglo, no necesariamnete todos:
+
+db.people.find({favorites : { $in : ["pretzel","beer"]}})
+
+
+Queries con documentos anidados
+
+{name: "Isaac", email : { work : "abd@gmail.com", personal : "personal@gmail.com"}}
+
+una posibilidad para encontrar este documento es hacer el query pasando como parametro exactamente el mismo objeto donde se encuentra la propiedad buscada:
+
+db.people.find({ email : {work : "abd@gmail.com", personal : "personal@gmail.com"}})
+
+si el parametro tiene las propirdades en el mismo orden, no funcionará, si se omiten propiedades tampoco, ejemplo:
+
+db.people.find({ email : {personal : "personal@gmail.com", work : "abd@gmail.com"}})  <---- X
+db.people.find({ email : {work : "abd@gmail.com"}}) <---------------- X
+
+como alternativa a esto, podemos usar . para acceder a otras partes documento embebido sin importar si tiene propiedades adicionales:
+
+db.people.find({ "email,work" : "abd@gmail.com"})
+
+el operador de . tambien aplica si los elementos del arreglo son objetos tambien
+
+
+{ product : "Super Duper-o-phonic", 
+  price : 100000000000,
+  reviews : [ { user : "fred", comment : "Great!" , rating : 5 },
+              { user : "tom" , comment : "I agree with Fred, somewhat!" , rating : 4 } ],
+  ... }
+  
+db.catalog.find( { "price" : { "$gt" : 10000 } , "reviews.rating" : { "$gte" : 5 } } );
+
+finds all products that cost more than 10,000 and that have a rating of 5 or better.
+
+Cursores
+
+cuando se ejecuta una consulta con find, en realidad lo que se muestra en pantalla es un cursor iterando la lista de resultados
+
+cur = db.coleccion.find();
+
+tienen metodos como hasNext: true o false, next: devuelve el siguiente elemento en el arreglo
+se puede limitar el numero de resultados con
+
+cur.limit(5)
+
+cur.sort({name: -1}) orden descendente
+
+estos metodos modifican el query a mandar a la BD, no se pueden aplicar despues de que ya se tienen resultados, por ejemplo, despues de aplicar 
+hasNext() al cursor
+
+skip(n) se salta los primeros n resultados
+
+primero se ejecuta sort, luego skip y luego limit, y las operaciones devielven el mismo cursor ya modificado, por lo que se pueden encadenar los metodos
+Es importante mencionar que los metodos no se ejecutan en el cliente si no en el servidor
+
+cur.sort({name: -1}).limit(3).skip(2);
+
+Contar resultados
+
+Podemos contar los resultados de una consulta por cierto criterio:
+
+db.scores.count({type: "exam"});
+
+
+Update
+
+para hacer un update sobre un documento, se debe usar db.coleccion.update({}, {})
+
+el primer argumento debe se un objeto que contenga el query para los elementos sobre los cuales se aplicará el update
+el segundo argumento es un objeto con las claves y valores que se van a actualizar
+
+db.coleccion.update({name : "smith"}, {name: "Thomson" , salary : 50000})
+
+si se actualiza y no se ponen todos los valores del objeto, estos seran descartados en el objeto ya guardado y el actualizado quedará sin ellos
+
+debido a esto, una alternativa es usar $set, de esta forma solo se manipulan los valores indicados
+
+db.coleccion.update({name : "smith"}, {$set : { salary : 50120}})
+
+$inc : es para hacer un incremento en una variable numerica
+
+db.coleccion.update({name : "smith"}, {$inc : { salary : 1}})
+
+si tomamos el documento anterior, esto resultaria en 
+
+{name : "smith", salary : 50120}
+
+si no existiera la propiedad salary, $inc la crea y le asigna un valor
+
+
+$unset: remueve un campo del documento que se especifique en el primer parametro
+
+db.coleccion.update({name : "smith"}, {$unset : { salary : 1}}) <---- el parametro 1 es irrelevante, puede llevar el valor que sea, mongodb lo ignora
+
+
+Actualizando valores de un array en un documento
+
+db.coleccion.update({_id : valorId} , {$set : {"nombrearreglo.indice" : nuevo valor}})
+
+db.coleccion.update({_id : 0} , {$set : {"a.2" : 5}})
+
+db.coleccion.update({_id : 0} , {$push : {a : 6}}) añade un elemento mas sin importar si se repite
+
+db.coleccion.update({_id : 0} , {$pop : {a : 1}})
+
+db.coleccion.update({_id : 0} , {$pop : {a : -1}}) remueve el primer elemento (mas a la izq)
+
+db.coleccion.update({_id : 0} , {$pushAll : {a : [7, 8, 9]}})
+
+db.coleccion.update({_id : 0} , {$pull : {a : 6}}) removera un elemento sin importar su posición, será una busqueda por valor dentro del array
+
+db.coleccion.update({_id : 0} , {$pullAll : {a : [6, 7 , 8 ]}}) remueve todas las ocurrencias de los valores pasados en el arreglo
+
+db.coleccion.update({_id : 0} , {$addToSet : {a : 6}}) añade un elemento al arreglo si este no existe
+
+
+Upsert
+
+Es para actualizar un documento o crearlo en caso de que no exista
+
+db.coleccion.update({name : "George"}, {$set: {age: 40}}, {upsert : true})
+
+
+Update multiple
+
+Dado que el primer argumento es un selector, si se manda un documento vacio, esto coincidirá con todos los documento, sin embargo 
+para que el update sea multiple, se debe especificar un tercer argumento con el valor {multi : true} 
+De lo contrario, el update solo actualizará el primer valor que encuentre
+
+db.people.update({}, {$set: {title: "Dr"}}, {multi : true})
+
+
+
+remove elements
+
+db.coleccion.remove({})
+
+eliminará todo
+
+db.coleccion.remove({name : {$gt : "M"}})
+eliminará los documentos que coincidan con el criterio de busqueda pasado como argumento 
+
+
+db.colection.drop()
+borra todos los datos, no va uno por uno a diferencua de remove
+
+
+
+_________________________________
+
+
+
+
+JAVA y mongo
+
+para haceruna busqueda dentro de una colección podemos pasar como argumento un documento Bson con las restricciones o desde un objeto filter:
+
+Bson filter = new Document("x", 0).append("y", new Document("$gt", 10).append("$lt",90));
+
+
+o
+
+Bson filter = and(eq("x",0), gt("y", 10), lt ("y", 90))
+
+y luego 
+
+List <Document> all = collection.find(filter).into(new Arraylist<Document>());
+
+
+********
+incluir o excluir campos en la consulta
+********
+
+
+se hace mediante "projection"
+
+
+Bson filter = and(eq("x",0), gt("y", 10), lt ("y", 90))
+Bson projection = new Document("x", 0)  <----indica que x no se incluya en la consulta
+
+
+List <Document> all = collection.find(filter)
+		.projection(projection)
+		.into(new Arraylist<Document>());
+
+
+
+
+de otra forma podria hacerse:
+
+Bson projection = Projections.exclude("x", "_id")
+List <Document> all = collection.find(filter)
+		.projection(projection)
+		.into(new Arraylist<Document>());
+
+
+estaríamos excluyendo x y _id de la consulta
+
+si queremos incluir solo se cambia 
+
+Bson projection = new Document("x", 1)  <----indica que x SI se incluya en la consulta
+
+o 
+
+
+Bson projection = Projections.include("x", "_id")
+
+
+para incluir algunos campos y excluir otros utilizamos:
+
+
+Bson projection = Projections.fields(Projections.include("x", "i"), Projections.exclude("_id"))
+
+o
+
+Bson projection = Projections.fields(Projections.include("x", "i"), Projections.excludeId())
+
+
+
+********
+Ordenamiento en las consultas
+********
+
+
+para ordenar los resultados de la consulta, debemos crear un documento para pasar com parametro al metodo sort:
+
+
+
+Bson projection = Projections.fields(Projections.include("x", "i"), Projections.excludeId())
+Bson sort = new Document("i", 1); <------indica forma ascendente
+
+
+List <Document> all = collection.find()
+		.projection(projection)
+		.sort(sort)
+		.into(new Arraylist<Document>());
+
+
+
+
+
+si queremos incluir otro campo de ordenamiento
+
+Bson sort = new Document("i", -1).append("j", -1); 
+
+si ponemos -1 indicamos orden descendente
+
+
+
+De otra forma 
+
+
+
+Bson sort = Sorts.ascending("i");
+
+
+para incluir mas campos:
+
+
+Bson sort = Sorts.orderBy(ascending("i"), descending("j"));
+
+tambien puede ordenarse por dos campos al mismo tiempo
+
+
+Bson sort = Sorts.ascending("i","j");
+
+
+
+*********
+skip y limit
+*********
+
+
+skip nos sirve para omitir resultados de la consulta
+
+limit para limitar el numero de resultados
+
+
+List <Document> all = collection.find()
+		.projection(projection)
+		.sort(sort)
+		.skip(20)
+		.limit(50)
+		.into(new Arraylist<Document>());
+
+
+Este codigo se saltara los primeros 20 resultados y solo devolverá 50 
+
+
+
+
+
+*******
+insertando documentos desde java
+*******
+
+
+MongoCollection coll = dataBase.getCollection("test");
+
+coll.insertOne(new Document("_id", 1).append("x", 1));
+
+
+*******
+actualizando documentos desde java
+*******
+
+
+coll.replaceOne(eq.("x", 5), new Document("_id", 5).append("x", 20).append("updated", true));
+
+
+tambien se puede hacer
+
+
+coll.updateOne(eq.("x", 5), new Document("$set", new Document("x", 20) ));
+
+
+
+para hacer upsert
+
+
+coll.updateOne(eq.("_id", 9), new Document("$set", new Document("x", 20) ), new UpdateOptions().upsert(true));
+
+
+
+si se cambia a false y el registro no existe, no se insertará nada
+
+
+coll.updateOne(gte.("_id", 5), new Document("$inc", new Document("x", 1) ));
+
+
+
+
+*******
+borrando documentos desde java
+*******
+
+
+collection.deleteMany(gt("_id", 4))
+
+
+borrara todos los documentos con id mayor que 4
+
+
+
+collection.deleteOne(eq("_id", 4))
+
+
+
+
+*********************
+MONGOPROC
+*******************
+
+
