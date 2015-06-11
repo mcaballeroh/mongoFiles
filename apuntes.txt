@@ -315,9 +315,9 @@ y luego
 List <Document> all = collection.find(filter).into(new Arraylist<Document>());
 
 
-********
-incluir o excluir campos en la consulta
-********
+*********************************************
+incluir o excluir campos en la consulta "projection"
+*********************************************
 
 
 se hace mediante "projection"
@@ -496,7 +496,172 @@ collection.deleteOne(eq("_id", 4))
 
 
 *********************
-Aqui empezaremos la tercera clase
+Esquemas y normalizacion
 *******************
+
+Debido a que mongodb no soporta joins, nuestro objetivo será mantener organizada toda nuestra información reelevante dentro de un mismo documento en
+determinada colección
+
+mongdb tampoco soporta transacciones, a cambio ofrece operaciones atomicas, esto es, actualizaciones de documentos que ya contienen toda la información 
+necesaria. no es necesario actualizar mas un documento 
+
+********Relaciones 1: 1
+
+una consideracion que debemos hacer en el diseño del esquema es la carga de la información, ejemplo:
+
+en una relación 1:1 empleado -> resume un empleado tienene un resume y viceversa, los esquemas posibles son:
+
+
+una coleccion de documentos empleado con in id_resume asociado
+una coleccion de documentos resume con un id_empleado asociado
+
+una coleccion de documentos empleado con un documento resume embebido
+una coleccion de documentos resume con un docuemnto empleado embebido
+
+al elegir el esquema adecuado considerando la carga de información se debería considerar si se necesita que en cada consulta venga la informacion del resume
+o solo se necesita la info del empleado
+
+tambien deberá considerarse el tamaño de los documentos, si estos crecen constantemente, debe considerarse que mongodb no soporta documentos embebidos de mas 
+de 16 MB
+
+un punto mas: atomicidad de datos. Si las colecciones de empleado y resume deben actualizarse al mismo tiempo, puede que convenga tener documentos embebidos
+
+tambien podría darse el caso de que un empleado o un resume pueda existir por si solo antes de relacionarse con la otra coleccion, en este caso, convendría tener
+las colecciones por separado
+
+
+
+********Relaciones one:many
+
+ejemplo
+
+city:person
+
+NY-> Millones de personas
+
+debido a que tener una coleccion city con un arreglo de millones de personas no es viable, podría tenerse una coleccion de personas con un objeto citu embebido en 
+cada documento de la colección, el problema con esto es que sería poco mantenible debido a que se multiplicaría la informacion de la ciudad 
+
+una solucion a esto seria true linking, esto es hacer referencia a una coleccion dentro de otra por medio del id, como el las BD relacionales
+
+ejemplo
+
+en la coleccion people un documento person con propiedad city: "NYC" y demas propiedades
+en la coleccion cyties un documento city con _id: "NYC" y demas propiedades
+
+
+
+
+********Relaciones one:few
+
+este caso es una relacion donde la parte de "muchos" representa un numero pequeño o manejable 
+
+ejemplo blog
+
+post -> few comments
+
+en este caso, los comentarios pueden ser varios pero no algo que no se pueda manejar, en este caso es recomendable usar un esquema de documento
+post con un arreglo de comments embebido
+
+
+********Relaciones many to many
+
+
+ejemplo: 
+
+books:authors
+student:teachers
+
+
+una aproximacion a la solucion seria un documento teacher con un array de ids de estudiantes y de la misma forma, documentos teacher con array de ids de estudiantes
+
+
+*****************
+Multikey Indexes
+*****************
+
+se utlizan para hacer busquedas complejas
+
+por ejemplo: 
+
+students
+
+{"_id" : 0, "name" : "Andrew", "teachers" : [0, 1]}
+{"_id" : 1, "name" : "George", "teachers" : [0, 1, 3]}
+{"_id" : 2, "name" : "Arthur", "teachers" : [0, 2]}
+
+
+teachers
+
+{"_id" : 0, "name" : "Charles"}
+{"_id" : 1, "name" : "Erick"}
+{"_id" : 2, "name" : "Blenda"}
+{"_id" : 3, "name" : "Felipe"}
+
+
+
+si queremos encontrar que estudiantes tienen ciertos profesores en particular, resulta un poco complejo
+
+podemos ayudarnos de:
+
+
+db.students.ensureIndex({'teachers': 1})
+
+db.students.find({'teachers': {$all : [0, 1]}})
+
+
+db.students.find({'teachers': {$all : [0, 1]}}).explain() <- nos sirve para obtener la explicación de la ejecucion de un query
+
+
+
+
+*****************
+Representacion de arboles
+*****************
+
+
+
+Para representar un arblo, la mejor forma de hacerlo es en cada "hoja", guardar un array con los ancestros:
+
+category
+_________
+
+
+_id: 7
+category_name: "outdoors"
+ancestors: [2, 5 8]
+
+
+de esta forma si queremos determinar los descendientes de undeterminado nodo, podemos encontrarlos buscando el valor del nodo en el arreglo ancestors de los
+demas nodos de la coleccion
+
+db.categories.find({ancestors: 34})
+
+
+
+*****************
+When to denormalize
+*****************
+
+conclusion
+
+1:1  <-embed
+1:many <- embed from the many to the one
+many:many <- link
+
+
+
+
+
+*****************
+ODM Object Document Mapper
+*****************
+
+Son herramientas de mapeo de objetos java a documentos que el driver de mongo pueda interpretar como documentos en la BD
+
+
+*****MOrphia
+
+
 
 
